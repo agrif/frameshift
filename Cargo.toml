@@ -1,0 +1,17 @@
+[package]
+name = "frameshift"
+version = "0.1.0"
+edition = "2021"
+
+authors = ["Aaron Griffith <aargri@gmail.com>"]
+repository = "https://github.com/agrif/frameshift"
+documentation = "https://docs.rs/frameshift"
+readme = "README.md"
+license = "MIT"
+
+keywords = ["time", "astronomy"]
+categories = ["aerospace", "date-and-time", "science::geo"]
+
+[dependencies]
+chrono = "0.4"
+julian = { version = "0.5", default-features = false }
