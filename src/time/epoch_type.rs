@@ -1,24 +1,13 @@
 use super::name::{FRAMESHIFT_0, JULIAN_DAY_0, MODIFIED_JULIAN_DAY_0};
 use super::{FromScale, Scale, TimeDelta, ToScale, TAI, TT};
 
-// FIXME this derives *way* too strict requirements on Scale
 /// A specific instant in time, measured in a specific [Scale].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct Epoch<Scale> {
     // measures delta from Jan 1, 1900 00:00:00.0 *in this scale*
     // so Jan 1, 1900 00:00 TAI is encoded as TimeDelta<TAI>::new(0, 0)
     // and Jan 1, 1900 00:00 TT is encoded as TimeDelta<TT>::new(0, 0)
     // this date is FRAMESHIFT_0
     delta: TimeDelta<Scale>,
-}
-
-impl<S> std::fmt::Display for Epoch<S>
-where
-    S: Scale,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_fmt(format_args!("{} {}", self.to_name(), S::NAME))
-    }
 }
 
 impl<S> Epoch<S> {
@@ -90,5 +79,99 @@ impl<S> Epoch<S> {
         S: ToScale<TT>,
     {
         self.to_scale()
+    }
+}
+
+impl<S> std::clone::Clone for Epoch<S> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<S> std::marker::Copy for Epoch<S> {}
+
+impl<S> std::fmt::Debug for Epoch<S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_struct("Epoch").field("delta", &self.delta).finish()
+    }
+}
+
+impl<S> std::fmt::Display for Epoch<S>
+where
+    S: Scale,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_fmt(format_args!("{} {}", self.to_name(), S::NAME))
+    }
+}
+
+impl<S> Default for Epoch<S> {
+    fn default() -> Self {
+        Self::from_frameshift(Default::default())
+    }
+}
+
+impl<S> std::cmp::PartialEq for Epoch<S> {
+    fn eq(&self, other: &Self) -> bool {
+        self.delta.eq(&other.delta)
+    }
+}
+
+impl<S> std::cmp::Eq for Epoch<S> {}
+
+impl<S> std::cmp::PartialOrd for Epoch<S> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.delta.partial_cmp(&other.delta)
+    }
+}
+
+impl<S> std::cmp::Ord for Epoch<S> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.delta.cmp(&other.delta)
+    }
+}
+
+impl<S> std::hash::Hash for Epoch<S> {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        self.delta.hash(state)
+    }
+}
+
+impl<S> std::ops::Add<TimeDelta<S>> for Epoch<S> {
+    type Output = Self;
+
+    fn add(self, rhs: TimeDelta<S>) -> Self::Output {
+        Self::from_frameshift(self.to_frameshift() + rhs)
+    }
+}
+
+impl<S> std::ops::AddAssign<TimeDelta<S>> for Epoch<S> {
+    fn add_assign(&mut self, rhs: TimeDelta<S>) {
+        self.delta += rhs;
+    }
+}
+
+impl<S> std::ops::Sub<TimeDelta<S>> for Epoch<S> {
+    type Output = Self;
+
+    fn sub(self, rhs: TimeDelta<S>) -> Self::Output {
+        Self::from_frameshift(self.to_frameshift() - rhs)
+    }
+}
+
+impl<S> std::ops::SubAssign<TimeDelta<S>> for Epoch<S> {
+    fn sub_assign(&mut self, rhs: TimeDelta<S>) {
+        self.delta -= rhs;
+    }
+}
+
+impl<S> std::ops::Sub for Epoch<S> {
+    type Output = TimeDelta<S>;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        self.delta - rhs.delta
     }
 }

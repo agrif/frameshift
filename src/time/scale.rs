@@ -36,7 +36,6 @@ where
 }
 
 /// International Atomic Time (*temps atomique international*).
-#[derive(Debug, Clone, Copy, Hash)]
 pub struct TAI;
 
 impl Scale for TAI {
@@ -56,7 +55,6 @@ impl FromScale<TT> for TAI {
 }
 
 /// Terrestrial Time.
-#[derive(Debug, Clone, Copy, Hash)]
 pub struct TT;
 
 const TT_TAI_OFFSET: chrono::TimeDelta = time_delta(32, 184 * NANOS_PER_MILLI);
