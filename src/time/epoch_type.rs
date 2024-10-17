@@ -1,5 +1,6 @@
 use super::name::{FRAMESHIFT_0, JULIAN_DAY_0, MODIFIED_JULIAN_DAY_0};
-use super::{FromScale, Scale, TimeDelta, ToScale, TAI, TT};
+use super::{FromScale, FromScaleWith, Scale, TimeDelta, ToScale, ToScaleWith, TAI, TT, UTC};
+use crate::provider::Provider;
 
 /// A specific instant in time, measured in a specific [Scale].
 pub struct Epoch<Scale> {
@@ -17,6 +18,10 @@ impl<S> Epoch<S> {
 
     pub const fn to_frameshift(&self) -> TimeDelta<S> {
         self.delta
+    }
+
+    pub const fn transmute<T>(&self) -> Epoch<T> {
+        Epoch::from_frameshift(self.to_frameshift().transmute())
     }
 
     pub fn from_name_delta(name: &chrono::NaiveDateTime, delta: TimeDelta<S>) -> Self {
@@ -53,6 +58,22 @@ impl<S> Epoch<S> {
         self.to_name_delta(&MODIFIED_JULIAN_DAY_0)
     }
 
+    pub fn from_scale_with<P, Other>(provider: &P, other: &Epoch<Other>) -> Option<Self>
+    where
+        P: Provider,
+        S: FromScaleWith<Other>,
+    {
+        S::from_frameshift_with(provider, &other.delta).map(Self::from_frameshift)
+    }
+
+    pub fn to_scale_with<P, Other>(&self, provider: &P) -> Option<Epoch<Other>>
+    where
+        P: Provider,
+        S: ToScaleWith<Other>,
+    {
+        S::to_frameshift_with(provider, &self.delta).map(Epoch::from_frameshift)
+    }
+
     pub fn from_scale<Other>(other: &Epoch<Other>) -> Self
     where
         S: FromScale<Other>,
@@ -67,6 +88,30 @@ impl<S> Epoch<S> {
         Epoch::from_frameshift(S::to_frameshift(&self.delta))
     }
 
+    pub fn to_tai_with<P>(&self, provider: &P) -> Option<Epoch<TAI>>
+    where
+        P: Provider,
+        S: ToScaleWith<TAI>,
+    {
+        self.to_scale_with(provider)
+    }
+
+    pub fn to_tt_with<P>(&self, provider: &P) -> Option<Epoch<TT>>
+    where
+        P: Provider,
+        S: ToScaleWith<TT>,
+    {
+        self.to_scale_with(provider)
+    }
+
+    pub fn to_utc_with<P>(&self, provider: &P) -> Option<Epoch<UTC>>
+    where
+        P: Provider,
+        S: ToScaleWith<UTC>,
+    {
+        self.to_scale_with(provider)
+    }
+
     pub fn to_tai(&self) -> Epoch<TAI>
     where
         S: ToScale<TAI>,
@@ -77,6 +122,13 @@ impl<S> Epoch<S> {
     pub fn to_tt(&self) -> Epoch<TT>
     where
         S: ToScale<TT>,
+    {
+        self.to_scale()
+    }
+
+    pub fn to_utc(&self) -> Epoch<UTC>
+    where
+        S: ToScale<UTC>,
     {
         self.to_scale()
     }

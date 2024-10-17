@@ -18,6 +18,10 @@ impl<S> TimeDelta<S> {
         self.delta
     }
 
+    pub const fn transmute<T>(&self) -> TimeDelta<T> {
+        TimeDelta::from_chrono(self.to_chrono())
+    }
+
     pub const fn new(secs: i64, nanos: u32) -> Option<Self> {
         match chrono::TimeDelta::new(secs, nanos) {
             Some(delta) => Some(Self::from_chrono(delta)),

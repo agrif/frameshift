@@ -15,3 +15,4 @@ categories = ["aerospace", "date-and-time", "science::geo"]
 [dependencies]
 chrono = "0.4"
 julian = { version = "0.5", default-features = false }
+thiserror = "1"
