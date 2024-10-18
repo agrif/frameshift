@@ -14,7 +14,7 @@
 
 use std::io::BufRead;
 
-use crate::time::{Epoch, TimeDelta, TAI, UTC};
+use crate::time::{Epoch, TimeDelta, TAI, UT1, UTC};
 
 #[derive(Debug, Clone)]
 pub struct CelestrakProvider {
@@ -171,13 +171,29 @@ impl CelestrakProvider {
             return None;
         }
 
+        // FIXME this lerp is a little suspicious
         Some(self.entries[idx - 1].lerp(&self.entries[idx], *t - self.entries[idx].time_tai()))
+    }
+
+    pub fn get_ut1(&self, t: &Epoch<UT1>) -> Option<Entry> {
+        let idx = self.entries.iter().position(|e| e.time_ut1() > *t)?;
+
+        if idx == 0 {
+            return None;
+        }
+
+        // FIXME this lerp is *extremely* suspicious
+        Some(self.entries[idx - 1].lerp(&self.entries[idx], *t - self.entries[idx].time_ut1()))
     }
 }
 
 impl Entry {
     pub fn time_tai(&self) -> Epoch<TAI> {
         self.time_utc.transmute() + TimeDelta::new(self.tai_utc, 0).unwrap()
+    }
+
+    pub fn time_ut1(&self) -> Epoch<UT1> {
+        self.time_utc.transmute() + TimeDelta::from_seconds(self.ut1_utc)
     }
 
     fn lerp<S>(&self, other: &Self, t: TimeDelta<S>) -> Self {
@@ -237,5 +253,13 @@ impl super::Provider for CelestrakProvider {
 
     fn tai_utc_for_tai(&self, epoch: &Epoch<TAI>) -> Option<TimeDelta<TAI>> {
         TimeDelta::new(self.get_tai(epoch)?.tai_utc, 0)
+    }
+
+    fn ut1_utc_for_utc(&self, epoch: &Epoch<UTC>) -> Option<TimeDelta<UT1>> {
+        Some(TimeDelta::from_seconds(self.get_utc(epoch)?.ut1_utc))
+    }
+
+    fn ut1_utc_for_ut1(&self, epoch: &Epoch<UT1>) -> Option<TimeDelta<UT1>> {
+        Some(TimeDelta::from_seconds(self.get_ut1(epoch)?.ut1_utc))
     }
 }

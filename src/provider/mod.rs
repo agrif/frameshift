@@ -1,6 +1,6 @@
 //! Providers for Earth orientation data and leap seconds.
 
-use crate::time::{Epoch, TimeDelta, TAI, UTC};
+use crate::time::{Epoch, TimeDelta, TAI, UT1, UTC};
 
 pub mod celestrak;
 
@@ -25,10 +25,21 @@ pub trait Provider {
     ///
     /// Returns [None] if data for this epoch is not available.
     fn tai_utc_for_utc(&self, epoch: &Epoch<UTC>) -> Option<TimeDelta<TAI>>;
+
     /// Return TAI - UTC for the given TAI [Epoch].
     ///
     /// Returns [None] if data for this epoch is not available.
     fn tai_utc_for_tai(&self, epoch: &Epoch<TAI>) -> Option<TimeDelta<TAI>>;
+
+    /// Return UT1 - UTC for the given UTC [Epoch].
+    ///
+    /// Returns [None] if data for this epoch is not available.
+    fn ut1_utc_for_utc(&self, epoch: &Epoch<UTC>) -> Option<TimeDelta<UT1>>;
+
+    /// Return UT1 - UTC for the given UT1 [Epoch].
+    ///
+    /// Returns [None] if data for this epoch is not available.
+    fn ut1_utc_for_ut1(&self, epoch: &Epoch<UT1>) -> Option<TimeDelta<UT1>>;
 }
 
 /// An empty Earth orientation provider.
@@ -46,6 +57,14 @@ impl Provider for EmptyProvider {
     }
 
     fn tai_utc_for_tai(&self, _epoch: &Epoch<TAI>) -> Option<TimeDelta<TAI>> {
+        None
+    }
+
+    fn ut1_utc_for_utc(&self, _epoch: &Epoch<UTC>) -> Option<TimeDelta<UT1>> {
+        None
+    }
+
+    fn ut1_utc_for_ut1(&self, _epoch: &Epoch<UT1>) -> Option<TimeDelta<UT1>> {
         None
     }
 }

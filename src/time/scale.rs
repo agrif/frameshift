@@ -133,6 +133,7 @@ impl ToScale<TAI> for Epoch<TT> {}
 
 impl_to_tai_family!(ToScale, TT);
 impl_to_via!(ToScaleWith, TT, TAI, UTC);
+impl_to_via!(ToScaleWith, TT, UTC, UT1);
 
 /// GPS Time.
 pub struct GPS;
@@ -167,6 +168,7 @@ impl ToScale<TAI> for Epoch<GPS> {}
 
 impl_to_tai_family!(ToScale, GPS);
 impl_to_via!(ToScaleWith, GPS, TAI, UTC);
+impl_to_via!(ToScaleWith, GPS, UTC, UT1);
 
 /// Coordinated Universal Time.
 pub struct UTC;
@@ -196,3 +198,34 @@ impl ToScaleWith<TAI> for Epoch<UTC> {
 }
 
 impl_to_tai_family!(ToScaleWith, UTC);
+
+/// Universal Time.
+pub struct UT1;
+
+impl Scale for UT1 {
+    const NAME: &'static str = "UT1";
+}
+
+impl ToScaleWith<UTC> for Epoch<UT1> {
+    fn to_scale_with<P>(&self, provider: &P) -> Option<Epoch<UTC>>
+    where
+        P: Provider,
+    {
+        let ut1_utc = provider.ut1_utc_for_ut1(self)?;
+        Some((*self - ut1_utc).transmute())
+    }
+}
+
+impl ToScaleWith<UT1> for Epoch<UTC> {
+    fn to_scale_with<P>(&self, provider: &P) -> Option<Epoch<UT1>>
+    where
+        P: Provider,
+    {
+        let ut1_utc = provider.ut1_utc_for_utc(self)?;
+        Some(self.transmute() + ut1_utc)
+    }
+}
+
+impl_to_via!(ToScaleWith, TAI, UTC, UT1);
+impl_to_via!(ToScaleWith, UT1, UTC, TAI);
+impl_to_tai_family!(ToScaleWith, UT1);

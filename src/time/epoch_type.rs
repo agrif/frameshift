@@ -1,5 +1,5 @@
 use super::name::{FRAMESHIFT_0, JULIAN_DAY_0, MODIFIED_JULIAN_DAY_0};
-use super::{Scale, TimeDelta, ToScale, ToScaleWith, GPS, TAI, TT, UTC};
+use super::{Scale, TimeDelta, ToScale, ToScaleWith, GPS, TAI, TT, UT1, UTC};
 use crate::provider::Provider;
 
 /// A specific instant in time, measured in a specific [Scale].
@@ -60,7 +60,7 @@ impl<S> Epoch<S> {
 }
 
 macro_rules! to_scale_helpers {
-    ($Scale:ty, $to_with:ident, $to:ident) => {
+    ($Scale:ty, $to_with:ident) => {
         /// Convert to
         #[doc=stringify!($Scale)]
         /// timescale, using an orientation provider.
@@ -73,6 +73,9 @@ macro_rules! to_scale_helpers {
         {
             self.to_scale_with(provider)
         }
+    };
+    ($Scale:ty, $to_with:ident, $to:ident) => {
+        to_scale_helpers!($Scale, $to_with);
 
         /// Convert to
         #[doc=stringify!($Scale)]
@@ -92,7 +95,8 @@ impl<S> Epoch<S> {
     to_scale_helpers!(TAI, to_tai_with, to_tai);
     to_scale_helpers!(TT, to_tt_with, to_tt);
     to_scale_helpers!(GPS, to_gps_with, to_gps);
-    to_scale_helpers!(UTC, to_utc_with, to_utc);
+    to_scale_helpers!(UTC, to_utc_with);
+    to_scale_helpers!(UT1, to_ut1_with);
 }
 
 impl Epoch<UTC> {
