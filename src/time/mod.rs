@@ -1,3 +1,5 @@
+//! Time [Scale]s and [Epoch]s.
+
 pub mod epoch;
 mod epoch_type;
 pub mod name;
