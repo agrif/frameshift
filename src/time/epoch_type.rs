@@ -95,6 +95,24 @@ impl<S> Epoch<S> {
     to_scale_helpers!(UTC, to_utc_with, to_utc);
 }
 
+impl Epoch<UTC> {
+    pub const fn from_chrono<Tz>(datetime: &chrono::DateTime<Tz>) -> Self
+    where
+        Tz: chrono::TimeZone,
+    {
+        Self::from_name(datetime.naive_utc())
+    }
+
+    pub fn to_chrono(&self) -> chrono::DateTime<chrono::Utc> {
+        use chrono::TimeZone;
+        chrono::Utc.from_utc_datetime(&self.to_name())
+    }
+
+    pub fn now() -> Self {
+        Self::from_chrono(&chrono::Utc::now())
+    }
+}
+
 impl<S> std::clone::Clone for Epoch<S> {
     fn clone(&self) -> Self {
         *self
@@ -121,6 +139,21 @@ where
 impl<S> Default for Epoch<S> {
     fn default() -> Self {
         Self::from_frameshift(Default::default())
+    }
+}
+
+impl<Tz> std::convert::From<chrono::DateTime<Tz>> for Epoch<UTC>
+where
+    Tz: chrono::TimeZone,
+{
+    fn from(value: chrono::DateTime<Tz>) -> Self {
+        Self::from_chrono(&value)
+    }
+}
+
+impl std::convert::From<Epoch<UTC>> for chrono::DateTime<chrono::Utc> {
+    fn from(value: Epoch<UTC>) -> Self {
+        value.to_chrono()
     }
 }
 

@@ -105,9 +105,9 @@ impl<S> std::convert::From<chrono::TimeDelta> for TimeDelta<S> {
     }
 }
 
-impl<S> std::convert::Into<chrono::TimeDelta> for TimeDelta<S> {
-    fn into(self) -> chrono::TimeDelta {
-        self.to_chrono()
+impl<S> std::convert::From<TimeDelta<S>> for chrono::TimeDelta {
+    fn from(value: TimeDelta<S>) -> Self {
+        value.to_chrono()
     }
 }
 
