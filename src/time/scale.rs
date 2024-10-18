@@ -15,65 +15,82 @@ pub trait Scale {
     const NAME: &'static str;
 }
 
-/// Convert from one timescale to another, using orientation data.
-pub trait FromScaleWith<Other>: Sized {
-    /// Convert the given [TimeDelta] from [FRAMESHIFT_0][super::name::FRAMESHIFT_0].
-    fn from_frameshift_with<P>(provider: &P, other: &TimeDelta<Other>) -> Option<TimeDelta<Self>>
+/// Convert an [Epoch] from one [Scale] to another, using an Earth
+/// orientation [Provider].
+///
+/// The resulting [Epoch] will represent the same moment in time as
+/// the original [Epoch].
+pub trait ToScaleWith<Other> {
+    /// Convert the given [Epoch] into a new [Scale].
+    fn to_scale_with<P>(&self, provider: &P) -> Option<Epoch<Other>>
     where
         P: Provider;
 }
 
-/// Convert to one timescale from another, using orientation data.
-pub trait ToScaleWith<Other>: Sized {
-    /// Convert the given [TimeDelta] from [FRAMESHIFT_0][super::name::FRAMESHIFT_0].
-    fn to_frameshift_with<P>(provider: &P, delta: &TimeDelta<Self>) -> Option<TimeDelta<Other>>
-    where
-        P: Provider;
-}
-
-/// Convert from one timescale to another, statelessly.
+/// Convert an [Epoch] from one [Scale] to another, using an Earth
+/// orientation [Provider].
 ///
-/// Implementing this is a promise that
-/// [FromScaleWith::from_frameshift_with] does not use the provider,
-/// and always returns [Some].
-pub trait FromScale<Other>: FromScaleWith<Other> {
-    /// Convert the given [TimeDelta] from [FRAMESHIFT_0][super::name::FRAMESHIFT_0].
-    fn from_frameshift(other: &TimeDelta<Other>) -> TimeDelta<Self> {
-        Self::from_frameshift_with(&EmptyProvider, other).unwrap()
-    }
-}
-
-/// Convert to one timescale from another, statelessly.
+/// The resulting [Epoch] will represent the same moment in time as
+/// the original [Epoch].
 ///
-/// Implementing this is a promise that
-/// [ToScaleWith::to_frameshift_with] does not use the provider,
-/// and always returns [Some].
+/// Implementing this is a promise that [ToScaleWith] does not use the
+/// provider, and always returns [Some].
 pub trait ToScale<Other>: ToScaleWith<Other> {
-    /// Convert the given [TimeDelta] from [FRAMESHIFT_0][super::name::FRAMESHIFT_0].
-    fn to_frameshift(delta: &TimeDelta<Self>) -> TimeDelta<Other> {
-        Self::to_frameshift_with(&EmptyProvider, delta).unwrap()
+    /// Convert the given [Epoch] into a new [Scale].
+    fn to_scale(&self) -> Epoch<Other> {
+        self.to_scale_with(&EmptyProvider).unwrap()
     }
 }
 
-impl<A, B> ToScaleWith<B> for A
-where
-    B: FromScaleWith<A>,
-{
-    fn to_frameshift_with<P>(provider: &P, other: &TimeDelta<Self>) -> Option<TimeDelta<B>>
-    where
-        P: Provider,
-    {
-        B::from_frameshift_with(provider, other)
+// identity
+impl<S> ToScaleWith<S> for Epoch<S> {
+    fn to_scale_with<P>(&self, _provider: &P) -> Option<Epoch<S>> {
+        Some(*self)
     }
 }
 
-impl<A, B> ToScale<B> for A
-where
-    B: FromScale<A>,
-{
-    fn to_frameshift(other: &TimeDelta<Self>) -> TimeDelta<B> {
-        B::from_frameshift(other)
-    }
+impl<S> ToScale<S> for Epoch<S> {}
+
+// helper for conversion via intermediate scale
+macro_rules! impl_to_via {
+    (ToScaleWith, $Start:tt, $Middle:tt, $End:tt) => {
+        static_cond::static_cond_item! {
+            if $Start != $End {
+                impl ToScaleWith<$End> for Epoch<$Start> {
+                    fn to_scale_with<P>(&self, provider: &P) -> Option<Epoch<$End>>
+                    where
+                        P: Provider,
+                    {
+                        let middle: Epoch<$Middle> = self.to_scale_with(provider)?;
+                        middle.to_scale_with(provider)
+                    }
+                }
+            }
+        }
+    };
+
+    (ToScale, $Start:tt, $Middle:tt, $End:tt) => {
+        static_cond::static_cond_item! {
+            if $Start != $End {
+                impl_to_via!(ToScaleWith, $Start, $Middle, $End);
+
+                impl ToScale<$End> for Epoch<$Start> {
+                    fn to_scale(&self) -> Epoch<$End> {
+                        let middle: Epoch<$Middle> = self.to_scale();
+                        middle.to_scale()
+                    }
+                }
+            }
+        }
+    };
+}
+
+// given ToScaleWith<TAI>, implement ToScaleWith<TaiLike>
+macro_rules! impl_to_tai_family {
+    ($Trait:tt, $Scale:tt) => {
+        impl_to_via!($Trait, $Scale, TAI, TT);
+        impl_to_via!($Trait, $Scale, TAI, GPS);
+    };
 }
 
 /// International Atomic Time (*temps atomique international*).
@@ -83,58 +100,73 @@ impl Scale for TAI {
     const NAME: &'static str = "TAI";
 }
 
-impl FromScaleWith<TAI> for TAI {
-    fn from_frameshift_with<P>(_provider: &P, other: &TimeDelta<Self>) -> Option<TimeDelta<Self>>
-    where
-        P: Provider,
-    {
-        Some(*other)
-    }
-}
-
-impl FromScale<TAI> for TAI {}
-
-impl FromScaleWith<TT> for TAI {
-    fn from_frameshift_with<P>(_provider: &P, other: &TimeDelta<TT>) -> Option<TimeDelta<Self>>
-    where
-        P: Provider,
-    {
-        Some((*other - TT_TAI_OFFSET).transmute())
-    }
-}
-
-impl FromScale<TT> for TAI {}
-
 /// Terrestrial Time.
 pub struct TT;
-
-const TT_TAI_OFFSET: TimeDelta<TT> = time_delta(32, 184 * NANOS_PER_MILLI);
 
 impl Scale for TT {
     const NAME: &'static str = "TT";
 }
 
-impl FromScaleWith<TT> for TT {
-    fn from_frameshift_with<P>(_provider: &P, other: &TimeDelta<Self>) -> Option<TimeDelta<Self>>
+const TT_TAI_OFFSET: TimeDelta<TT> = time_delta(32, 184 * NANOS_PER_MILLI);
+
+impl ToScaleWith<TT> for Epoch<TAI> {
+    fn to_scale_with<P>(&self, _provider: &P) -> Option<Epoch<TT>>
     where
         P: Provider,
     {
-        Some(*other)
+        Some(self.transmute() + TT_TAI_OFFSET)
     }
 }
 
-impl FromScale<TT> for TT {}
+impl ToScale<TT> for Epoch<TAI> {}
 
-impl FromScaleWith<TAI> for TT {
-    fn from_frameshift_with<P>(_provider: &P, other: &TimeDelta<TAI>) -> Option<TimeDelta<Self>>
+impl ToScaleWith<TAI> for Epoch<TT> {
+    fn to_scale_with<P>(&self, _provider: &P) -> Option<Epoch<TAI>>
     where
         P: Provider,
     {
-        Some(other.transmute() + TT_TAI_OFFSET)
+        Some((*self - TT_TAI_OFFSET).transmute())
     }
 }
 
-impl FromScale<TAI> for TT {}
+impl ToScale<TAI> for Epoch<TT> {}
+
+impl_to_tai_family!(ToScale, TT);
+impl_to_via!(ToScaleWith, TT, TAI, UTC);
+
+/// GPS Time.
+pub struct GPS;
+
+impl Scale for GPS {
+    const NAME: &'static str = "GPS";
+}
+
+const GPS_TAI_OFFSET: TimeDelta<GPS> = time_delta(-19, 0);
+
+impl ToScaleWith<GPS> for Epoch<TAI> {
+    fn to_scale_with<P>(&self, _provider: &P) -> Option<Epoch<GPS>>
+    where
+        P: Provider,
+    {
+        Some(self.transmute() + GPS_TAI_OFFSET)
+    }
+}
+
+impl ToScale<GPS> for Epoch<TAI> {}
+
+impl ToScaleWith<TAI> for Epoch<GPS> {
+    fn to_scale_with<P>(&self, _provider: &P) -> Option<Epoch<TAI>>
+    where
+        P: Provider,
+    {
+        Some((*self - GPS_TAI_OFFSET).transmute())
+    }
+}
+
+impl ToScale<TAI> for Epoch<GPS> {}
+
+impl_to_tai_family!(ToScale, GPS);
+impl_to_via!(ToScaleWith, GPS, TAI, UTC);
 
 /// Coordinated Universal Time.
 pub struct UTC;
@@ -143,33 +175,24 @@ impl Scale for UTC {
     const NAME: &'static str = "UTC";
 }
 
-impl FromScaleWith<UTC> for UTC {
-    fn from_frameshift_with<P>(_provider: &P, other: &TimeDelta<Self>) -> Option<TimeDelta<Self>>
+impl ToScaleWith<UTC> for Epoch<TAI> {
+    fn to_scale_with<P>(&self, provider: &P) -> Option<Epoch<UTC>>
     where
         P: Provider,
     {
-        Some(*other)
+        let tai_utc = provider.tai_utc_for_tai(self)?;
+        Some((*self - tai_utc).transmute())
     }
 }
 
-impl FromScale<UTC> for UTC {}
-
-impl FromScaleWith<TAI> for UTC {
-    fn from_frameshift_with<P>(provider: &P, other: &TimeDelta<TAI>) -> Option<TimeDelta<Self>>
+impl ToScaleWith<TAI> for Epoch<UTC> {
+    fn to_scale_with<P>(&self, provider: &P) -> Option<Epoch<TAI>>
     where
         P: Provider,
     {
-        let tai_utc = provider.tai_utc_for_tai(&Epoch::from_frameshift(*other))?;
-        Some((*other - tai_utc).transmute())
+        let tai_utc = provider.tai_utc_for_utc(self)?;
+        Some(self.transmute() + tai_utc)
     }
 }
 
-impl FromScaleWith<UTC> for TAI {
-    fn from_frameshift_with<P>(provider: &P, other: &TimeDelta<UTC>) -> Option<TimeDelta<Self>>
-    where
-        P: Provider,
-    {
-        let tai_utc = provider.tai_utc_for_utc(&Epoch::from_frameshift(*other))?;
-        Some(other.transmute() + tai_utc)
-    }
-}
+impl_to_tai_family!(ToScaleWith, UTC);

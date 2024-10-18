@@ -1,5 +1,5 @@
 use super::name::{FRAMESHIFT_0, JULIAN_DAY_0, MODIFIED_JULIAN_DAY_0};
-use super::{FromScale, FromScaleWith, Scale, TimeDelta, ToScale, ToScaleWith, TAI, TT, UTC};
+use super::{Scale, TimeDelta, ToScale, ToScaleWith, GPS, TAI, TT, UTC};
 use crate::provider::Provider;
 
 /// A specific instant in time, measured in a specific [Scale].
@@ -57,81 +57,42 @@ impl<S> Epoch<S> {
     pub fn to_modified_julian_day(&self) -> TimeDelta<S> {
         self.to_name_delta(&MODIFIED_JULIAN_DAY_0)
     }
+}
 
-    pub fn from_scale_with<P, Other>(provider: &P, other: &Epoch<Other>) -> Option<Self>
-    where
-        P: Provider,
-        S: FromScaleWith<Other>,
-    {
-        S::from_frameshift_with(provider, &other.delta).map(Self::from_frameshift)
-    }
+macro_rules! to_scale_helpers {
+    ($Scale:ty, $to_with:ident, $to:ident) => {
+        /// Convert to
+        #[doc=stringify!($Scale)]
+        /// timescale, using an orientation provider.
+        ///
+        /// See [ToScaleWith].
+        pub fn $to_with<P>(&self, provider: &P) -> Option<Epoch<$Scale>>
+        where
+            P: Provider,
+            Self: ToScaleWith<$Scale>,
+        {
+            self.to_scale_with(provider)
+        }
 
-    pub fn to_scale_with<P, Other>(&self, provider: &P) -> Option<Epoch<Other>>
-    where
-        P: Provider,
-        S: ToScaleWith<Other>,
-    {
-        S::to_frameshift_with(provider, &self.delta).map(Epoch::from_frameshift)
-    }
+        /// Convert to
+        #[doc=stringify!($Scale)]
+        /// timescale, statelessly.
+        ///
+        /// See [ToScale].
+        pub fn $to(&self) -> Epoch<$Scale>
+        where
+            Self: ToScale<$Scale>,
+        {
+            self.to_scale()
+        }
+    };
+}
 
-    pub fn from_scale<Other>(other: &Epoch<Other>) -> Self
-    where
-        S: FromScale<Other>,
-    {
-        Self::from_frameshift(S::from_frameshift(&other.delta))
-    }
-
-    pub fn to_scale<Other>(&self) -> Epoch<Other>
-    where
-        S: ToScale<Other>,
-    {
-        Epoch::from_frameshift(S::to_frameshift(&self.delta))
-    }
-
-    pub fn to_tai_with<P>(&self, provider: &P) -> Option<Epoch<TAI>>
-    where
-        P: Provider,
-        S: ToScaleWith<TAI>,
-    {
-        self.to_scale_with(provider)
-    }
-
-    pub fn to_tt_with<P>(&self, provider: &P) -> Option<Epoch<TT>>
-    where
-        P: Provider,
-        S: ToScaleWith<TT>,
-    {
-        self.to_scale_with(provider)
-    }
-
-    pub fn to_utc_with<P>(&self, provider: &P) -> Option<Epoch<UTC>>
-    where
-        P: Provider,
-        S: ToScaleWith<UTC>,
-    {
-        self.to_scale_with(provider)
-    }
-
-    pub fn to_tai(&self) -> Epoch<TAI>
-    where
-        S: ToScale<TAI>,
-    {
-        self.to_scale()
-    }
-
-    pub fn to_tt(&self) -> Epoch<TT>
-    where
-        S: ToScale<TT>,
-    {
-        self.to_scale()
-    }
-
-    pub fn to_utc(&self) -> Epoch<UTC>
-    where
-        S: ToScale<UTC>,
-    {
-        self.to_scale()
-    }
+impl<S> Epoch<S> {
+    to_scale_helpers!(TAI, to_tai_with, to_tai);
+    to_scale_helpers!(TT, to_tt_with, to_tt);
+    to_scale_helpers!(GPS, to_gps_with, to_gps);
+    to_scale_helpers!(UTC, to_utc_with, to_utc);
 }
 
 impl<S> std::clone::Clone for Epoch<S> {
